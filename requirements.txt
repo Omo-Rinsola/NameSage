@@ -4,4 +4,4 @@ fastapi
 pydantic
 uvicorn
 uuid7
-
+httpx
