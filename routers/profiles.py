@@ -1,44 +1,82 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from dependencies import get_db
 from services.profile_service import build_profile
 from models.profile import Profile
 from crud import profiles as crud
-
+from schemas.profiles import ProfileCreate
 from utils.helpers import generate_id
 
 router = APIRouter(prefix="/api", tags=["Profiles"])
 
 
-# ---------------- POST ----------------
-@router.post("/profiles")
-async def create_profile(name: str, db: Session = Depends(get_db)):
+def profile_to_dict(profile: Profile) -> dict:
+    """Serialize a Profile ORM object to a full dict."""
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "gender": profile.gender,
+        "gender_probability": profile.gender_probability,
+        "sample_size": profile.sample_size,
+        "age": profile.age,
+        "age_group": profile.age_group,
+        "country_id": profile.country_id,
+        "country_probability": profile.country_probability,
+        "created_at": profile.created_at,
+    }
 
-    # idempotency
-    existing = crud.get_by_name(db, name)
 
-    if existing:
-        return {
-            "status": "success",
-            "message": "Profile already exists",
-            "data": existing
-        }
+def profile_to_list_dict(profile: Profile) -> dict:
+    """Serialize a Profile ORM object to the list (filtered) format."""
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "gender": profile.gender,
+        "age": profile.age,
+        "age_group": profile.age_group,
+        "country_id": profile.country_id,
+    }
 
-    # service call
-    profile_data = await build_profile(name)
 
-    # error handling (REQUIRED FORMAT)
-    if "error" in profile_data:
+# ---------------- POST /api/profiles ----------------
+
+@router.post("/profiles", status_code=201)
+async def create_profile(body: ProfileCreate, db: Session = Depends(get_db)):
+    # 400 — missing or empty name
+    if not body.name or not body.name.strip():
         raise HTTPException(
-            status_code=502,
-            detail={
-                "status": "error",
-                "message": profile_data["error"]
+            status_code=400,
+            detail={"status": "error", "message": "Name is required"}
+        )
+
+    name = body.name.strip().lower()  # normalize for idempotency
+
+    # Idempotency — return existing profile if name already stored
+    existing = crud.get_by_name(db, name)
+    if existing:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success",
+                "message": "Profile already exists",
+                "data": profile_to_dict(existing),
             }
         )
 
-    # create DB object
+    # Call external APIs and build profile data
+    profile_data = await build_profile(name)
+
+    # 502 — upstream API returned invalid data
+    if "error" in profile_data:
+        raise HTTPException(
+            status_code=502,
+            detail={"status": "502", "message": profile_data["error"]}
+        )
+
+    # Persist to database
     new_profile = Profile(
         id=generate_id(),
         name=name,
@@ -49,65 +87,77 @@ async def create_profile(name: str, db: Session = Depends(get_db)):
         age_group=profile_data["age_group"],
         country_id=profile_data["country_id"],
         country_probability=profile_data["country_probability"],
-        created_at=profile_data["created_at"]
+        created_at=profile_data["created_at"],
     )
 
     crud.create(db, new_profile)
 
-    return {
-        "status": "success",
-        "data": new_profile
-    }
+    return JSONResponse(
+        status_code=201,
+        content={
+            "status": "success",
+            "data": profile_to_dict(new_profile),
+        }
+    )
 
 
-# ---------------- GET BY ID ----------------
+# ---------------- GET /api/profiles/{id} ----------------
+
 @router.get("/profiles/{id}")
 def get_profile(id: str, db: Session = Depends(get_db)):
-
     profile = crud.get_by_id(db, id)
 
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail={
-                "status": "error",
-                "message": "Profile not found"
-            }
+            detail={"status": "error", "message": "Profile not found"}
         )
 
     return {
         "status": "success",
-        "data": profile
+        "data": profile_to_dict(profile),
     }
 
 
-# ---------------- GET ALL ----------------
-@router.get("/profiles")
-def get_profiles(db: Session = Depends(get_db)):
+# ---------------- GET /api/profiles ----------------
 
-    profiles = db.query(Profile).all()
+@router.get("/profiles")
+def get_profiles(
+        gender: str = Query(None),
+        country_id: str = Query(None),
+        age_group: str = Query(None),
+        db: Session = Depends(get_db),
+):
+    query = db.query(Profile)
+
+    # Case-insensitive filtering
+    if gender:
+        query = query.filter(func.lower(Profile.gender) == gender.lower())
+    if country_id:
+        query = query.filter(func.lower(Profile.country_id) == country_id.lower())
+    if age_group:
+        query = query.filter(func.lower(Profile.age_group) == age_group.lower())
+
+    profiles = query.all()
 
     return {
         "status": "success",
         "count": len(profiles),
-        "data": profiles
+        "data": [profile_to_list_dict(p) for p in profiles],
     }
 
 
-# ---------------- DELETE ----------------
+# ---------------- DELETE /api/profiles/{id} ----------------
+
 @router.delete("/profiles/{id}", status_code=204)
 def delete_profile(id: str, db: Session = Depends(get_db)):
-
     profile = crud.get_by_id(db, id)
 
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail={
-                "status": "error",
-                "message": "Profile not found"
-            }
+            detail={"status": "error", "message": "Profile not found"}
         )
 
     crud.delete(db, profile)
-    return
+    return "204 No Content"

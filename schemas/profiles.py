@@ -1,17 +1,15 @@
 # defines response and input structure for routers
 from pydantic import BaseModel
-from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 
-# --------- input/request--------
-
+# --------- Input / Request ---------
 
 class ProfileCreate(BaseModel):
     name: str
 
-#--------- output/response schema-------
 
+# --------- Full Profile (POST response, GET by ID) ---------
 
 class ProfileData(BaseModel):
     id: str
@@ -23,23 +21,25 @@ class ProfileData(BaseModel):
     age_group: str
     country_id: str
     country_probability: float
-    created_at: datetime
+    created_at: str  # stored and returned as ISO 8601 string
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # Pydantic v2 (use orm_mode = True for Pydantic v1)
 
 
 class ProfileResponse(BaseModel):
     status: str
     data: ProfileData
 
-# Already exist
+
 class ProfileExistsResponse(BaseModel):
     status: str
     message: str
     data: ProfileData
 
-# get list of the same gender, country_id, age_group
+
+# --------- List Profile (GET /profiles) ---------
+
 class ProfileListData(BaseModel):
     id: str
     name: str
@@ -49,10 +49,17 @@ class ProfileListData(BaseModel):
     country_id: str
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ProfileListResponse(BaseModel):
     status: str
     count: int
     data: List[ProfileListData]
+
+
+# --------- Error ---------
+
+class ErrorResponse(BaseModel):
+    status: str
+    message: str

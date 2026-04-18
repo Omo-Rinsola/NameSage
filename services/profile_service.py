@@ -8,8 +8,7 @@ from datetime import datetime, timezone
 
 # AGE GROUP LOGIC
 
-
-def get_age_group(age: int):
+def get_age_group(age: int) -> str:
     if age <= 12:
         return "child"
     elif age <= 19:
@@ -22,35 +21,27 @@ def get_age_group(age: int):
 
 # MAIN SERVICE FUNCTION
 
-
 async def build_profile(name: str):
 
-    # Call external APIs
+    # Call all three external APIs
     gender_data = await get_gender_data(name)
     age_data = await get_age_data(name)
     country_data = await get_country_data(name)
 
-    # VALIDATION (IMPORTANT FOR TASK)
-
-    # Genderize validation
+    # --- Genderize validation ---
+    # Fail if gender is null OR count is 0
     if not gender_data.get("gender") or gender_data.get("count", 0) == 0:
-        return {
-            "error": "Genderize returned invalid response"
-        }
+        return {"error": "Genderize returned an invalid response"}
 
-    # Agify validation
-    if not age_data.get("age"):
-        return {
-            "error": "Agify returned invalid response"
-        }
+    # --- Agify validation ---
+    if age_data.get("age") is None:
+        return {"error": "Agify returned an invalid response"}
 
-    # Nationalize validation
+    # --- Nationalize validation ---
     if not country_data.get("country") or len(country_data["country"]) == 0:
-        return {
-            "error": "Nationalize returned invalid response"
-        }
+        return {"error": "Nationalize returned an invalid response"}
 
-    # PROCESS DATA
+    # --- Process data ---
 
     gender = gender_data["gender"]
     gender_probability = gender_data["probability"]
@@ -58,15 +49,14 @@ async def build_profile(name: str):
 
     age = age_data["age"]
 
-    # pick country with highest probability
+    # Pick country with highest probability
     country = max(
         country_data["country"],
         key=lambda x: x["probability"]
     )
 
-    # FINAL PROFILE STRUCTURE
-
-    profile = {
+    # Build and return profile dict
+    return {
         "name": name,
         "gender": gender,
         "gender_probability": gender_probability,
@@ -75,7 +65,6 @@ async def build_profile(name: str):
         "age_group": get_age_group(age),
         "country_id": country["country_id"],
         "country_probability": country["probability"],
-        "created_at": datetime.now(timezone.utc)
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
-    return profile
