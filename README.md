@@ -7,7 +7,7 @@ A FastAPI demographic intelligence API that enriches names with gender, age, and
 ##  Live API
 
 Base URL:  
-[link](https://hng-stage-0-gender-classifier-production-1330.up.railway.app)
+[link](https://namesage-production-1330.up.railway.app)
 
 
 ---
@@ -15,9 +15,10 @@ Base URL:
 ## 🛠 Tech Stack
 
 - FastAPI  
-- SQLite  
-- SQLAlchemy  
-- httpx  
+- PostgreSQL (or your DB)  
+- SQLAlchemy ORM  
+- httpx
+-   
 
 ---
 
