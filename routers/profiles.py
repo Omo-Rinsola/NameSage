@@ -126,6 +126,14 @@ def get_profiles(
         gender: str = Query(None),
         country_id: str = Query(None),
         age_group: str = Query(None),
+        min_age: int = Query(None),
+        max_age: int = Query(None),
+        min_gender_probability: float = Query(None),
+        min_country_probability: float = Query(None),
+        page: int = Query(1, ge=1),
+        limit: int = Query(10, ge=1, le=50),
+        sort_by: str = Query(None),
+        order: str = Query("asc"),
         db: Session = Depends(get_db),
 ):
     query = db.query(Profile)
@@ -137,12 +145,34 @@ def get_profiles(
         query = query.filter(func.lower(Profile.country_id) == country_id.lower())
     if age_group:
         query = query.filter(func.lower(Profile.age_group) == age_group.lower())
+    if min_age:
+        query = query.filter(Profile.age >= min_age)
 
-    profiles = query.all()
+    if max_age:
+        query = query.filter(Profile.age <= max_age)
+    if min_gender_probability:
+        query = query.filter(Profile.gender_probability >= min_gender_probability)
+    if min_country_probability:
+        query = query.filter(Profile.country_probability >= min_country_probability)
+
+    total = query.count()
+
+    if sort_by:
+        column = getattr(Profile, sort_by, None)
+        if column is not None:
+            if order =="desc":
+                query = query.order_by(column.desc())
+            else:
+                query = query.order_by(column.asc())
+
+    skip = (page - 1) * limit
+    profiles = query.offset(skip).limit(limit).all()
 
     return {
         "status": "success",
-        "count": len(profiles),
+        "page": page,
+        "limit": limit,
+        "total": total,
         "data": [profile_to_list_dict(p) for p in profiles],
     }
 

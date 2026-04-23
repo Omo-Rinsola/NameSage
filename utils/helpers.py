@@ -2,6 +2,5 @@
 
 from uuid_extensions import uuid7
 
-
 def generate_id() -> str:
     return str(uuid7())

@@ -13,12 +13,13 @@ class Profile(Base):
 
     gender = Column(String)
     gender_probability = Column(Float)
-    sample_size = Column(Integer)
 
     age = Column(Integer)
     age_group = Column(String)
 
     country_id = Column(String)
+    country_name = Column(String)
     country_probability = Column(Float)
 
-    created_at = Column(String)  # Store as ISO 8601 string to preserve UTC timezone
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))  # Auto-generated
