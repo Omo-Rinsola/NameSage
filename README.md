@@ -1,6 +1,6 @@
 # NameSage (Profile Intelligence Service)
 
-A simple backend API that takes a name, gets basic information (gender, age, and country) from external APIs, stores the result in a database, and allows you to retrieve or manage the data.
+A FastAPI demographic intelligence API that enriches names with gender, age, and country data, with advanced filtering, sorting, pagination, and natural language search.
 
 ---
 
