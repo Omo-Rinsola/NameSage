@@ -9,6 +9,7 @@ from models.profile import Profile
 from crud import profiles as crud
 from schemas.profiles import ProfileCreate
 from utils.helpers import generate_id
+from services.nl_parser import parse_nl_query
 
 router = APIRouter(prefix="/api", tags=["Profiles"])
 
@@ -100,6 +101,52 @@ async def create_profile(body: ProfileCreate, db: Session = Depends(get_db)):
         }
     )
 
+# -------------------- profile search with natural language-------
+@router.get("/profiles/search")
+def search_profiles(
+        q: str = Query(...),
+        page: int = Query(1, ge=1),
+        limit: int = Query(10, ge=1, le=50),
+        db: Session = Depends(get_db),
+):
+    if not q or not q.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Invalid query parameters"}
+        )
+
+    filters = parse_nl_query(q)
+
+    if not filters:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Unable to interpret query"}
+        )
+
+    query = db.query(Profile)
+
+    if "gender" in filters:
+        query = query.filter(Profile.gender == filters["gender"])
+    if "age_group" in filters:
+        query = query.filter(Profile.age_group == filters["age_group"])
+    if "country_id" in filters:
+        query = query.filter(Profile.country_id == filters["country_id"])
+    if "min_age" in filters:
+        query = query.filter(Profile.age >= filters["min_age"])
+    if "max_age" in filters:
+        query = query.filter(Profile.age <= filters["max_age"])
+
+    total = query.count()
+    skip = (page - 1) * limit
+    profiles = query.offset(skip).limit(limit).all()
+
+    return {
+        "status": "success",
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "data": [profile_to_list_dict(p) for p in profiles],
+    }
 
 # ---------------- GET /api/profiles/{id} ----------------
 
