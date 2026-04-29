@@ -19,6 +19,7 @@ app.add_middleware(
 )
 
 app.include_router(profiles_router)
+app.include_router()
 
 
 @app.get("/")
